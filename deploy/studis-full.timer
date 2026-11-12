@@ -1,0 +1,10 @@
+[Unit]
+Description=vut-kalendar full sync
+
+[Timer]
+OnCalendar=*-*-* 05,16:15:00 UTC
+Persistent=true
+Unit=studis@full.service
+
+[Install]
+WantedBy=timers.target

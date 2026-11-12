@@ -1,0 +1,10 @@
+[Unit]
+Description=vut-kalendar alerts tick
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=false
+Unit=studis@alerts.service
+
+[Install]
+WantedBy=timers.target

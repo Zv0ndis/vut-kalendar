@@ -1,0 +1,12 @@
+[Unit]
+Description=vut-kalendar %i run
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@USER@
+Environment=PATH=@UVDIR@:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+EnvironmentFile=@DIR@/.env
+ExecStart="@DIR@/deploy/run.sh" %i
+TimeoutStartSec=15min

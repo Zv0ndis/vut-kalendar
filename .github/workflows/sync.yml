@@ -1,0 +1,54 @@
+name: sync
+# Studis (+ Moodle) -> your own Google calendar, twice a day and on demand (Actions > sync > Run workflow).
+# Stateless: sync.py diffs against what is in Google, nothing is committed back. Secrets: see README.md.
+on:
+  schedule:
+    - cron: "15 5,16 * * *"   # UTC
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Pustit i mazání, které pojistka proti hromadnému mazání zastavila (--force)"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency: vut-kalendar-sync
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VUT_USER: ${{ secrets.VUT_USER }}
+      VUT_PASS: ${{ secrets.VUT_PASS }}
+      VUT_API_CLIENT_ID: ${{ secrets.VUT_API_CLIENT_ID }}
+      VUT_API_SECRET: ${{ secrets.VUT_API_SECRET }}
+      MOODLE_ICS_URL: ${{ secrets.MOODLE_ICS_URL }}
+      CALENDAR_NAME: ${{ vars.CALENDAR_NAME || secrets.CALENDAR_NAME }}
+      SKIP_TITLES: ${{ vars.SKIP_TITLES || secrets.SKIP_TITLES }}
+      ROOM_URL: ${{ vars.ROOM_URL || secrets.ROOM_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: required secrets present
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_TOKEN: ${{ secrets.GOOGLE_TOKEN }}
+        run: |
+          for v in VUT_USER VUT_PASS GOOGLE_CLIENT_SECRET GOOGLE_TOKEN; do
+            [ -n "${!v}" ] || { echo "::error::Chybí secret $v (Settings > Secrets and variables > Actions, viz README)"; missing=1; }
+          done
+          [ -z "${missing:-}" ]
+      - name: Google secrets to files
+        env:
+          CS: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          TK: ${{ secrets.GOOGLE_TOKEN }}
+        run: |
+          umask 077
+          printf '%s' "$CS" > client_secret.json
+          printf '%s' "$TK" > token.json
+      - name: browser for the Studis login
+        run: uv run --locked fetch_studis.py --install-browser
+      - name: fetch from Studis and Moodle
+        run: uv run --locked fetch_studis.py
+      - name: sync to Google Calendar
+        run: uv run --locked sync.py ${{ inputs.force && '--force' || '' }}

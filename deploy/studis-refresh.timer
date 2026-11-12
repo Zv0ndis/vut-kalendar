@@ -1,0 +1,10 @@
+[Unit]
+Description=vut-kalendar refresh
+
+[Timer]
+OnCalendar=*-*-* *:33:00 UTC
+Persistent=true
+Unit=studis@refresh.service
+
+[Install]
+WantedBy=timers.target

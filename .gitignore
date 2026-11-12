@@ -1,0 +1,21 @@
+# secrets and the personal data this tool fetches: never commit these
+.env
+token.json
+client_secret.json
+.vut-token.json*
+studis.json
+studis-timetable.ics
+studis-exams.ics
+studis-moodle.ics
+api-failures.json
+api-usage.json
+points-seen.json
+digest-state.json
+alerts-state.json
+zhelper-notes.json
+.run.lock
+.alerts-fail
+__pycache__/
+.ruff_cache/
+*.tmp
+.fetch.lock

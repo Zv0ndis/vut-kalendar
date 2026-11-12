@@ -1,0 +1,17 @@
+[Unit]
+Description=ZHelper Discord bot (slash commands -> studis@ runs)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=@USER@
+WorkingDirectory=@DIR@
+EnvironmentFile=@DIR@/.env
+ExecStart="@UV@" run --locked zhelper/bot.py
+Restart=always
+RestartSec=10
+# uv execs Python, so a stop ends as signal TERM (already clean); 143 is just in case a wrapper exits 128+15
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

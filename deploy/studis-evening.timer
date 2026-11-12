@@ -1,0 +1,10 @@
+[Unit]
+Description=vut-kalendar evening preview
+
+[Timer]
+OnCalendar=*-*-* 20:00 Europe/Prague
+Persistent=false
+Unit=studis@evening.service
+
+[Install]
+WantedBy=timers.target
