@@ -14,9 +14,13 @@ esc() { printf '%s' "${1//%/%%}" | sed -e 's/[&|\\]/\\&/g'; }
 for f in "$dir"/deploy/studis@.service "$dir"/deploy/studis-*.timer "$dir"/deploy/zhelper.service; do
   sed -e "s|@USER@|$USER|g" -e "s|@DIR@|$(esc "$dir")|g" -e "s|@UV@|$(esc "$uv")|g" -e "s|@UVDIR@|$(esc "$(dirname "$uv")")|g" "$f" | sudo tee "/etc/systemd/system/$(basename "$f")" > /dev/null
 done
-# the bot (runs as you) starts runs, reads their journal and restarts itself without a password prompt
+# the bot (runs as you) starts runs and reads their journal without a password prompt. One rule per exact command line
+# zhelper/agent.py and bot.py run (MODES, UNITS, logs()); no wildcards, so no other unit and no other journalctl flag gets through.
 tmp=$(mktemp)
-printf '%s ALL=(root) NOPASSWD: %s start --no-block studis@*, %s restart zhelper, %s -u studis@* *\n' "$USER" "$sc" "$sc" "$jc" > "$tmp"
+{
+  for m in refresh full weekly; do printf '%s ALL=(root) NOPASSWD: %s start --no-block studis@%s\n' "$USER" "$sc" "$m"; done
+  for m in full refresh weekly alerts evening; do printf '%s ALL=(root) NOPASSWD: %s -u studis@%s -n 40 --no-pager\n' "$USER" "$jc" "$m"; done
+} > "$tmp"
 sudo visudo -cf "$tmp" && sudo install -m 440 -o root -g root "$tmp" /etc/sudoers.d/zhelper
 rm -f "$tmp"
 sudo systemctl daemon-reload

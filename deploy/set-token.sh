@@ -1,6 +1,7 @@
 #!/bin/bash
 # Prompt for the Discord bot token (hidden input), store it in .env at the repo root, restart the bot if its unit exists.
 cd "$(dirname "$(readlink -f "$0")")/.."
+umask 077  # .env.new is never readable by others, not even for a moment
 read -rsp "Discord bot token: " t; echo
 [ -n "$t" ] || exit 1
 touch .env && chmod 600 .env

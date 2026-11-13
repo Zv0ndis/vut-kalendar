@@ -44,7 +44,7 @@ Run as your normal user (not root) from the repo root, in this order:
     deploy/install.sh              # units with your user, path and uv; sudoers rule; browser; timers
     sudo systemctl enable --now zhelper
 
-`install.sh` does not start the timers until `.env` has `DISCORD_BOT_TOKEN`; if it is missing, run `set-token.sh` and `install.sh` again. The sudoers rule (`/etc/sudoers.d/zhelper`, validated with `visudo -cf` before it is installed) lets the bot start `studis@*` runs, read their journal and restart itself without a password. Logs: `journalctl -u zhelper`, `journalctl -u studis@alerts`.
+`install.sh` does not start the timers until `.env` has `DISCORD_BOT_TOKEN`; if it is missing, run `set-token.sh` and `install.sh` again. The sudoers rule (`/etc/sudoers.d/zhelper`, validated with `visudo -cf` before it is installed) lets the bot run exactly the commands its code uses without a password: start the `full`, `refresh` and `weekly` runs and read the last 40 journal lines of each `studis@` unit. Nothing else (no wildcards), so `set-token.sh` asks for your sudo password when it restarts the bot. An install from an older version keeps its broader rule until you rerun `deploy/install.sh`. Logs: `journalctl -u zhelper`, `journalctl -u studis@alerts`.
 
 `.env` values are used as written: put comments on their own line, never after a value (systemd's `EnvironmentFile` keeps the trailing comment as part of the value). The scripts also read `.env` themselves, so they work when run by hand; real environment variables win.
 
