@@ -17,20 +17,13 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      VUT_USER: ${{ secrets.VUT_USER }}
-      VUT_PASS: ${{ secrets.VUT_PASS }}
-      VUT_API_CLIENT_ID: ${{ secrets.VUT_API_CLIENT_ID }}
-      VUT_API_SECRET: ${{ secrets.VUT_API_SECRET }}
-      MOODLE_ICS_URL: ${{ secrets.MOODLE_ICS_URL }}
-      CALENDAR_NAME: ${{ vars.CALENDAR_NAME || secrets.CALENDAR_NAME }}
-      SKIP_TITLES: ${{ vars.SKIP_TITLES || secrets.SKIP_TITLES }}
-      ROOM_URL: ${{ vars.ROOM_URL || secrets.ROOM_URL }}
-    steps:
+    steps:   # secrets are passed only to the steps that use them
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: required secrets present
         env:
+          VUT_USER: ${{ secrets.VUT_USER }}
+          VUT_PASS: ${{ secrets.VUT_PASS }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_TOKEN: ${{ secrets.GOOGLE_TOKEN }}
         run: |
@@ -49,6 +42,16 @@ jobs:
       - name: browser for the Studis login
         run: uv run --locked fetch_studis.py --install-browser
       - name: fetch from Studis and Moodle
+        env:
+          VUT_USER: ${{ secrets.VUT_USER }}
+          VUT_PASS: ${{ secrets.VUT_PASS }}
+          VUT_API_CLIENT_ID: ${{ secrets.VUT_API_CLIENT_ID }}
+          VUT_API_SECRET: ${{ secrets.VUT_API_SECRET }}
+          MOODLE_ICS_URL: ${{ secrets.MOODLE_ICS_URL }}
         run: uv run --locked fetch_studis.py
       - name: sync to Google Calendar
+        env:
+          CALENDAR_NAME: ${{ vars.CALENDAR_NAME || secrets.CALENDAR_NAME }}
+          SKIP_TITLES: ${{ vars.SKIP_TITLES || secrets.SKIP_TITLES }}
+          ROOM_URL: ${{ vars.ROOM_URL || secrets.ROOM_URL }}
         run: uv run --locked sync.py ${{ inputs.force && '--force' || '' }}
