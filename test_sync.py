@@ -265,3 +265,10 @@ assert T("20260328")[0] == "2026-03-28T09:00:00Z" and T("20260330")[0] == "2026-
 W = lambda d: sorted(k[0] for k in parse_ics(V([f"DTSTART;TZID=Europe/Prague:{d}T100000", f"DTEND;TZID=Europe/Prague:{d}T110000", "SUMMARY:X", "RRULE:FREQ=WEEKLY;COUNT=2"])))  # noqa: E731
 assert W("20261022") == ["2026-10-22T08:00:00Z", "2026-10-29T09:00:00Z"] and W("20260326") == ["2026-03-26T09:00:00Z", "2026-04-02T08:00:00Z"]
 print("ok")
+
+# clean(): entities are decoded before tags are stripped, so encoded markup never comes back to life (also when encoded twice)
+from sync import clean  # noqa: E402
+assert clean('X  <span class="normal-text">(rezervace)</span>') == "X (rezervace)" and clean("A &amp; B") == "A & B"
+for enc in ("&lt;b&gt;x&lt;/b&gt;", "&amp;lt;b&amp;gt;x&amp;lt;/b&amp;gt;", "&lt;script&gt;x", "<b>x</b>"):
+    assert clean(enc) in ("x", "scriptx") and "<" not in clean(enc) and clean(clean(enc)) == clean(enc), clean(enc)
+print("clean ok")

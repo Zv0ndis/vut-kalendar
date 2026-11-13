@@ -127,7 +127,12 @@ def unesc(s):  # iCal TEXT escapes: \, \; \\ \n
 
 
 def clean(s):  # Studis puts HTML in SUMMARY: 'X  <span class="normal-text">(rezervace)</span>' -> 'X (rezervace)'
-    return " ".join(html.unescape(re.sub(r"<[^>]*>", "", s)).split())
+    for _ in range(5):  # entities first (however deeply encoded), then tags: "&lt;b&gt;" must not come out as live markup
+        if (u := html.unescape(s)) == s:
+            break
+        s = u
+    return " ".join(re.sub(r"<[^>]*>", "", s).replace("<", "").split())  # a lone "<" opens nothing here, but drop it anyway
+
 
 
 def vevents(text):  # props() of every VEVENT that has a start and is not cancelled

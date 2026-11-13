@@ -197,6 +197,7 @@ wd = Path(tempfile.mkdtemp())
 fs.write_atomic(wd / "a.txt", "one")
 fs.write_atomic(wd / "a.txt", "two")
 assert (wd / "a.txt").read_text() == "two" and [p.name for p in wd.iterdir()] == ["a.txt"]
+assert stat.S_IMODE(os.stat(wd / "a.txt").st_mode) == 0o600  # grades and timetable: owner only
 sf = wd / "streak.json"
 assert [fs.api_streak(True, sf) for _ in range(3)] == [1, 2, 3] and fs.api_streak(False, sf) == 0 and fs.api_streak(True, sf) == 1
 sf.write_text("garbage")

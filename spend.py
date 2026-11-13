@@ -36,11 +36,29 @@ PRICE = prices(os.environ.get("ZHELPER_PRICES", DEFAULT_PRICE))
 CAP = envutil.num("ZHELPER_DAILY_USD", 1.0, float)
 
 
-def _load():
+LOST = False  # the last record() could not be written: ok() stays False until a write works again
+
+
+def _load(strict=False):
+    """Usage file as a dict. No file yet = {}; unreadable or corrupt = {} too, unless strict (then it raises)."""
     try:
-        return json.loads(USAGE.read_text())
-    except (OSError, ValueError):
+        d = json.loads(USAGE.read_text())
+        if not isinstance(d, dict):
+            raise ValueError("not an object")
+        return d
+    except FileNotFoundError:
         return {}
+    except (OSError, ValueError):
+        if strict:
+            raise
+        return {}
+
+
+def _save(data):
+    # ponytail: read-modify-write without a lock; calls rarely overlap, a lost row only under-counts one call
+    with tempfile.NamedTemporaryFile("w", dir=USAGE.parent, suffix=".tmp", delete=False) as f:
+        json.dump(data, f, indent=1)
+    os.replace(f.name, USAGE)
 
 
 def today(now=None):
@@ -48,17 +66,32 @@ def today(now=None):
 
 
 def ok(now=None):
-    return _load().get(today(now), {}).get("usd", 0) < CAP
+    """Under today's cap. Fails closed: False when the usage file can't be read (corrupt, no permission) or the last
+    record() was lost and writing still fails, because then nothing is counting the spend."""
+    global LOST
+    try:
+        data = _load(strict=True)
+        if not os.access(USAGE.parent, os.W_OK):
+            raise PermissionError(f"{USAGE.parent} is not writable")
+        if LOST:
+            _save(data)
+            LOST = False
+        return float(data.get(today(now), {}).get("usd", 0)) < CAP
+    except (OSError, ValueError, TypeError, AttributeError) as e:
+        print(f"spend.ok: usage file unusable ({e!r}), AI calls blocked")
+        return False
 
 
 def record(usage, now=None):
     """Add one response's usage to today's row and return the row; usage=None (test stubs) is ignored. Never raises:
-    a failure here must not cost the caller its answer, it only under-counts the day."""
+    a failure here must not cost the caller its answer, but it blocks further calls (ok() -> False) until writing works."""
+    global LOST
     if usage is None:
         return None
     try:
         return _record(usage, now)
     except Exception as e:
+        LOST = True
         print(f"spend.record failed: {e!r}")
         return None
 
@@ -66,7 +99,7 @@ def record(usage, now=None):
 def _record(usage, now):
     n = dict(zip(KEYS, (usage.input_tokens, usage.output_tokens, getattr(usage, "cache_read_input_tokens", 0) or 0,
                         getattr(usage, "cache_creation_input_tokens", 0) or 0)))
-    data = _load()
+    data = _load(strict=True)
     row = data.setdefault(today(now), {"calls": 0, **dict.fromkeys(KEYS, 0), "usd": 0.0})
     row["calls"] += 1
     for k in KEYS:
@@ -74,10 +107,7 @@ def _record(usage, now):
     row["usd"] = round(row["usd"] + sum(n[k] * PRICE[k] for k in KEYS) / 1e6, 6)
     old = today((now or datetime.now(PRAGUE)) - timedelta(days=60))
     data = {d: v for d, v in data.items() if d > old}
-    # ponytail: read-modify-write without a lock; calls rarely overlap, a lost row only under-counts one call
-    with tempfile.NamedTemporaryFile("w", dir=USAGE.parent, suffix=".tmp", delete=False) as f:
-        json.dump(data, f, indent=1)
-    os.replace(f.name, USAGE)
+    _save(data)
     return row
 
 
@@ -106,11 +136,19 @@ if __name__ == "__main__" and sys.argv[1:] == ["--selftest"]:
     assert "2026-11-01" not in _load()  # pruned after 60 days
     # never raises: unwritable file, broken usage object, bad price table
     USAGE = Path(tempfile.mkdtemp()) / "missing-dir" / "api-usage.json"
-    assert record(u, d1) is None
+    assert not ok(d1)  # nowhere to write the count: blocked before the first call (fail closed)
+    assert record(u, d1) is None and LOST and not ok(d1)
+    USAGE.parent.mkdir()
+    assert ok(d1) and not LOST and USAGE.exists()  # no file yet is fine once it can be written
+    USAGE.write_text("{broken")
+    assert not ok(d1) and record(u, d1) is None and USAGE.read_text() == "{broken"  # corrupt file: blocked, never silently reset
+    USAGE.write_text("[]")
+    assert not ok(d1)
     USAGE = Path(tempfile.mkdtemp()) / "api-usage.json"
+    LOST = False
     assert record(N(input_tokens="x", output_tokens=1), d1) is None
     PRICE = {}
-    assert record(u, d1) is None
+    assert record(u, d1) is None and ok(d1)  # not a file problem: the next write works, so calls go on
     # malformed ZHELPER_PRICES falls back to the defaults
     assert prices("1,2") == prices("abc") == prices(DEFAULT_PRICE) == dict(zip(KEYS, (0.10, 0.50, 0.01, 0.125)))
     assert prices("1,2,3,4")["cache_write"] == 4.0

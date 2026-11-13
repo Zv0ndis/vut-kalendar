@@ -151,10 +151,10 @@ class ScrapeError(Exception):
 
 
 def dump(pg, why):
-    print(f"FAILED: {why}\nURL: {pg.url}", file=sys.stderr)
-    for e in pg.query_selector_all("input, button, a"):
-        print(" ", e.evaluate("e=>[e.tagName,e.type||'',e.name||'',(e.textContent||'').trim().slice(0,50)].join('|')"), file=sys.stderr)
-    print(re.sub(r"\s+", " ", pg.inner_text("body"))[:600], file=sys.stderr)
+    """Where the scrape stopped, without page content: the login page's text and link labels (name, e-mail, session links) stay out of the journal."""
+    print(f"FAILED: {why}\nURL: {pg.url.split('?')[0].split('#')[0]}", file=sys.stderr)
+    for e in pg.query_selector_all("input, button"):
+        print(" ", e.evaluate("e=>[e.tagName,e.type||'',e.name||''].join('|')"), file=sys.stderr)
     raise ScrapeError(why)
 
 
@@ -350,7 +350,7 @@ def scrape(need, prev):
                 pg.goto(ICS_URL.split("&ics")[0], wait_until="networkidle")  # export covers the displayed timetable
                 out["timetable"] = pg.request.get(ICS_URL).text()
                 if "BEGIN:VCALENDAR" not in out["timetable"]:  # an empty calendar is fine (timetable not published yet); a login page is not
-                    print(re.sub(r"<[^>]+>|\s+", " ", out["timetable"])[:500], file=sys.stderr)
+                    print(f"export: {len(out['timetable'])} chars, not iCal", file=sys.stderr)
                     dump(pg, "export is not a calendar")
             pg.goto(BASE + "?sn=terminy_zk", wait_until="networkidle")
             if "exams" in need:
@@ -390,7 +390,7 @@ def write_atomic(path, text):
     """tmp file in the same directory + rename: a reader never sees half a file."""
     with tempfile.NamedTemporaryFile("w", dir=path.parent, prefix=path.name + ".", suffix=".tmp", delete=False) as f:
         f.write(text)
-    os.chmod(f.name, 0o644)  # NamedTemporaryFile is 0600; the files were world-readable before
+    # stays 0600 (NamedTemporaryFile's mode): grades, timetable and tokens are nobody else's business on a shared machine
     os.replace(f.name, path)
 
 
