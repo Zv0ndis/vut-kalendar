@@ -11,7 +11,7 @@
   uv run digest.py --fail URL short failure notice, sent as a new message
   --dry-run prints instead of sending. Needs DISCORD_BOT_TOKEN and DISCORD_USER_ID.
 """
-import json, os, sys, urllib.request
+import json, os, re, sys, urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 import envutil  # noqa: F401  loads .env
@@ -52,6 +52,12 @@ def load_notes():
             **({"next": d["next"]} if isinstance(d, dict) and isinstance(d.get("next"), int) else {})}  # agent.remember's id counter
 
 
+def plain(s, cap=200):
+    """Calendar/Studis/Moodle text for a DM: one line, capped, Discord markdown defused, so a title can't pose as a
+    masked link [text](url), a mention, a timestamp or a new section. Ordinary titles come out unchanged."""
+    return re.sub(r"([\\*_~`|\[\]<>])", r"\\\1", " ".join(str(s).split())[:cap])
+
+
 def points_text(v, t=None):
     """Points as /body and alerts show them: 7 b., or 7/20 (zápočet) when the course has a threshold."""
     return "–" if v is None else f"{v}/{t['points']} ({t['label']})" if t else f"{v} b."
@@ -61,7 +67,7 @@ def discord(method, path, body):
     req = urllib.request.Request(API + path, data=body and json.dumps(body).encode(), method=method, headers={
         "Authorization": f"Bot {os.environ['DISCORD_BOT_TOKEN']}", "Content-Type": "application/json",
         "User-Agent": "DiscordBot (vut-kalendar, 1.0)"})
-    r = urllib.request.urlopen(req).read()
+    r = urllib.request.urlopen(req, timeout=30).read()
     return json.loads(r) if r else None
 
 
@@ -134,7 +140,7 @@ def hm(ev):
 def line(ev):
     room = ev.get("location", "").split(" (")[0].split(",")[0]
     t = hm(ev)
-    return f"{t if t == 'celý den' else stamp(datetime.fromisoformat(ev['start']['dateTime']))}  {ev.get('summary', '?')}" + (f"  ·  {room}" if room and not room.startswith("http") else "")
+    return f"{t if t == 'celý den' else stamp(datetime.fromisoformat(ev['start']['dateTime']))}  {plain(ev.get('summary', '?'))}" + (f"  ·  {plain(room)}" if room and not room.startswith("http") else "")
 
 
 def calendars(svc):
@@ -168,7 +174,7 @@ def due_row(e, now):
     st = datetime.fromisoformat(e["start"]["dateTime"]).astimezone(PRAGUE)
     d = (st.date() - now.date()).days
     dot = "" if d > 7 else "🟢" if d > 5 else "🟡" if d > 3 else "🟠" if d > 1 else "🔴"
-    return f"{stamp(st, 'R')} · {stamp(st, 'f')} {dot or ' '} {e['summary']}"
+    return f"{stamp(st, 'R')} · {stamp(st, 'f')} {dot or ' '} {plain(e['summary'])}"
 
 
 def upcoming(svc, cals, now):
@@ -313,6 +319,10 @@ def selftest():
                                      wt(None, None, registered=True)]}
     r = registrations(T("2026-11-02T10:00"))
     assert r.count("\n") == 2 and "ZAREGISTRUJ SE" in r and "registrace od 5.11." in r and "29.12" not in r, r
+    # titles in DMs: one line, markdown defused; ordinary titles unchanged
+    assert plain("ISA (P) – odevzdání: Projekt 1") == "ISA (P) – odevzdání: Projekt 1" and plain("x" * 300) == "x" * 200
+    assert plain("[klikni](https://x.cz) **a**\n# b <@1> <t:1:R>") == "\\[klikni\\](https://x.cz) \\*\\*a\\*\\* # b \\<@1\\> \\<t:1:R\\>"
+    assert "\\[x\\]" in line({"summary": "[x](http://a)", "start": {"dateTime": "2026-11-02T10:00:00+01:00"}, "end": {"dateTime": "2026-11-02T11:00:00+01:00"}})
     print("selftest ok")
 
 

@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import envutil
 from sync import PRAGUE, extra_events
-from digest import stamp, send, load_notes, points_text
+from digest import stamp, send, load_notes, points_text, plain
 
 HERE = Path(__file__).parent
 STATE = HERE / "alerts-state.json"
@@ -67,11 +67,11 @@ def deadline(now, d):
     title, due_ = d[0], dt(d[1])
     out, start = [], due_ - 3 * H
     if due_ - 24 * H <= now < due_:
-        out.append((f"dl24:{title}:{d[1]}", f"📌 {title} · {stamp(due_, 'R')}", False))
+        out.append((f"dl24:{title}:{d[1]}", f"📌 {plain(title)} · {stamp(due_, 'R')}", False))
     if moved := quiet(start):  # moved to 21:55 and loud, so a missed 21:55 tick still goes out
         start = before_quiet(start)
     if start <= now < due_:
-        out.append((f"dl3:{title}:{d[1]}", f"❗ {title} · {stamp(due_, 'R')}", moved))
+        out.append((f"dl3:{title}:{d[1]}", f"❗ {plain(title)} · {stamp(due_, 'R')}", moved))
     return out
 
 
